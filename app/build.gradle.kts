@@ -31,10 +31,18 @@ android {
         if (secretsFile.exists()) {
             secretsFile.inputStream().use { secretsProps.load(it) }
         }
-        val ytmApiKey = (secretsProps.getProperty("YTM_API_KEY") ?: "")
-            .replace("\\", "\\\\")
-            .replace("\"", "\\\"")
-        buildConfigField("String", "YTM_API_KEY", "\"$ytmApiKey\"")
+
+        // Always produce a valid Java string literal even when keys are absent (e.g. in CI
+        // without secrets configured).  The secrets-gradle-plugin outputs raw property values,
+        // so an empty value would compile to `= ;` which is illegal Java.  By declaring these
+        // fields here and adding them to the plugin's ignoreList below we ensure they are always
+        // properly quoted with a safe empty-string fallback.
+        fun escapedQuoted(raw: String?): String {
+            val safe = (raw ?: "").replace("\\", "\\\\").replace("\"", "\\\"")
+            return "\"$safe\""
+        }
+        buildConfigField("String", "MAPS_API_KEY", escapedQuoted(secretsProps.getProperty("MAPS_API_KEY")))
+        buildConfigField("String", "YTM_API_KEY", escapedQuoted(secretsProps.getProperty("YTM_API_KEY")))
     }
 
     signingConfigs {
@@ -169,4 +177,10 @@ secrets {
     // The plugin defaults to "local.properties"
     propertiesFileName = "secrets.properties"
     defaultPropertiesFileName = "local.properties"
+
+    // Prevent the plugin from auto-generating BuildConfig fields for these keys.
+    // They are declared manually in defaultConfig above with proper quoting and
+    // an empty-string fallback so that CI builds without secrets still compile.
+    ignoreList.add("MAPS_API_KEY")
+    ignoreList.add("YTM_API_KEY")
 }

@@ -46,11 +46,11 @@ class HybridResolver @Inject constructor(
         monochromeResults.forEach { result ->
             val titleDistance = levenshteinDistance(
                 track.title.lowercase(),
-                result.title.lowercase()
+                result.trackName.lowercase()
             )
             val artistDistance = levenshteinDistance(
                 track.artist.lowercase(),
-                result.artist.lowercase()
+                result.artistName.lowercase()
             )
             val totalDistance = titleDistance + artistDistance
 
@@ -66,7 +66,7 @@ class HybridResolver @Inject constructor(
         val isAcceptableMatch = bestMatch != null && minDistance <= threshold
 
         if (isAcceptableMatch) {
-            return bestMatch!!.streamUrl
+            return bestMatch!!.downloadUrl
         }
 
         return resolveYtmFallback(track.videoId)

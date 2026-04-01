@@ -49,7 +49,7 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideMetrolistExtractor(): MetrolistExtractor {
-        return MetrolistYtmExtractor()
+    fun provideMetrolistExtractor(okHttpClient: OkHttpClient): MetrolistExtractor {
+        return MetrolistYtmExtractor(okHttpClient)
     }
 }

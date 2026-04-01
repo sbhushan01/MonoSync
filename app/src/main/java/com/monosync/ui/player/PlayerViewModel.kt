@@ -1,12 +1,15 @@
 package com.monosync.ui.player
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.monosync.data.remote.YtmTrack
 import com.monosync.data.repository.TrackRepository
+import com.monosync.model.LyricLine
 import com.monosync.model.PlayerState
 import com.monosync.model.Resource
 import com.monosync.model.Track
+import com.monosync.model.parseLrc
 import com.monosync.playback.MediaControllerManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -25,6 +28,10 @@ class PlayerViewModel @Inject constructor(
     private val mediaManager: MediaControllerManager,
     private val trackRepository: TrackRepository
 ) : ViewModel() {
+
+    companion object {
+        private const val TAG = "PlayerViewModel"
+    }
 
     val playerState: StateFlow<PlayerState> = mediaManager.playerCurrentState
 
@@ -57,6 +64,10 @@ class PlayerViewModel @Inject constructor(
 
     private val _repeatMode = MutableStateFlow(0) // 0=off, 1=all, 2=one
     val repeatMode = _repeatMode.asStateFlow()
+
+    // ── Synchronized Lyrics State ──
+    private val _lyrics = MutableStateFlow<List<LyricLine>>(emptyList())
+    val lyrics: StateFlow<List<LyricLine>> = _lyrics.asStateFlow()
 
     init {
         // Poll playback position every 250ms for seek bar sync
@@ -114,9 +125,23 @@ class PlayerViewModel @Inject constructor(
 
     fun startNewPlayback(url: String, track: Track) {
         _currentTrack.value = track
+        _lyrics.value = emptyList() // Clear stale lyrics
         mediaManager.playMedia(url)
     }
 
+    /**
+     * Directly injects an LRC string (e.g. from a local file or external API).
+     * Parses it and updates the lyrics state flow.
+     */
+    fun setLyricsFromLrc(lrcString: String?) {
+        _lyrics.value = parseLrc(lrcString)
+    }
+
+    /**
+     * Loads a track by resolving its stream URL and fetching lyrics **in parallel**
+     * via [TrackRepository.getTrackDetails]. Lyrics are cached to Room for
+     * offline access. If lyrics fail, playback proceeds normally.
+     */
     fun loadAndPlayTrack(ytmTrack: YtmTrack, trackInfo: Track) {
         val exceptionHandler = CoroutineExceptionHandler { _, exception ->
             _streamState.value = Resource.Error("Network error: ${exception.message}")
@@ -125,13 +150,25 @@ class PlayerViewModel @Inject constructor(
         viewModelScope.launch(exceptionHandler) {
             _streamState.value = Resource.Loading
             _currentTrack.value = trackInfo
+            _lyrics.value = emptyList() // Clear previous track's lyrics
 
-            val result = trackRepository.getStreamUrl(ytmTrack)
-            _streamState.value = result
+            // Parallel fetch: stream URL + lyrics
+            val details = trackRepository.getTrackDetails(ytmTrack)
+            _streamState.value = details.streamUrlResult
 
-            if (result is Resource.Success) {
-                mediaManager.playMedia(result.data)
+            // Start playback if stream resolved
+            if (details.streamUrlResult is Resource.Success) {
+                mediaManager.playMedia(details.streamUrlResult.data)
+            }
+
+            // Apply lyrics if available (already cached to Room by repository)
+            if (!details.lyricsLrc.isNullOrBlank()) {
+                _lyrics.value = parseLrc(details.lyricsLrc)
+                Log.d(TAG, "Loaded ${_lyrics.value.size} lyric lines for ${ytmTrack.videoId}")
+            } else {
+                Log.d(TAG, "No lyrics available for ${ytmTrack.videoId}")
             }
         }
     }
 }
+

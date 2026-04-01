@@ -2,8 +2,15 @@ package com.monosync.ui.player
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -19,6 +26,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -54,6 +64,7 @@ import androidx.compose.material3.rememberStandardBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -64,15 +75,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.monosync.model.LyricLine
 import com.monosync.model.Resource
 import com.monosync.model.Track
+import com.monosync.model.findActiveLyricIndex
 import com.monosync.ui.components.formatDuration
 import com.monosync.ui.components.shimmerLoadingAnimation
 import com.monosync.ui.components.swipeToSkipTrack
@@ -88,6 +104,7 @@ fun NowPlayingScreen(
     duration: Long,
     isShuffleEnabled: Boolean,
     repeatMode: Int,
+    lyrics: List<LyricLine>,
     onPlayPauseToggle: () -> Unit,
     onSkipNext: () -> Unit,
     onSkipPrevious: () -> Unit,
@@ -179,37 +196,60 @@ fun NowPlayingScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Album Art
-                    val isResolving = streamState is Resource.Loading
-                    Box(
-                        modifier = Modifier
-                            .size(300.dp)
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(colorScheme.surfaceVariant)
-                            .shimmerLoadingAnimation(isLoading = isResolving)
-                            .swipeToSkipTrack(
-                                onSeekNext = onSkipNext,
-                                onSeekPrevious = onSkipPrevious
-                            ),
-                        contentAlignment = Alignment.Center
+                    // ── Album Art / Lyrics Toggle Area ──
+                    AnimatedVisibility(
+                        visible = !showLyrics,
+                        enter = fadeIn(tween(300)),
+                        exit = fadeOut(tween(300))
                     ) {
-                        if (currentTrack.albumArtUrl.isNotEmpty()) {
-                            AsyncImage(
-                                model = currentTrack.albumArtUrl,
-                                contentDescription = "Album Art",
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .clip(RoundedCornerShape(20.dp))
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Default.MusicNote,
-                                contentDescription = "Album Art",
-                                modifier = Modifier.size(80.dp),
-                                tint = colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                            )
+                        // Album Art
+                        val isResolving = streamState is Resource.Loading
+                        Box(
+                            modifier = Modifier
+                                .size(300.dp)
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(colorScheme.surfaceVariant)
+                                .shimmerLoadingAnimation(isLoading = isResolving)
+                                .swipeToSkipTrack(
+                                    onSeekNext = onSkipNext,
+                                    onSeekPrevious = onSkipPrevious
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (currentTrack.albumArtUrl.isNotEmpty()) {
+                                AsyncImage(
+                                    model = currentTrack.albumArtUrl,
+                                    contentDescription = "Album Art",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(RoundedCornerShape(20.dp))
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.MusicNote,
+                                    contentDescription = "Album Art",
+                                    modifier = Modifier.size(80.dp),
+                                    tint = colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                                )
+                            }
                         }
+                    }
+
+                    // ── Synchronized Lyrics Panel ──
+                    AnimatedVisibility(
+                        visible = showLyrics,
+                        enter = fadeIn(tween(300)) + slideInVertically(tween(400)) { it / 4 },
+                        exit = fadeOut(tween(300)) + slideOutVertically(tween(300)) { it / 4 }
+                    ) {
+                        SynchronizedLyricsPanel(
+                            lyrics = lyrics,
+                            currentPositionMs = currentPosition,
+                            onSeekTo = onSeekTo,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(300.dp)
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(32.dp))
@@ -397,33 +437,6 @@ fun NowPlayingScreen(
                             )
                         }
                     }
-
-                    // Lyrics panel
-                    AnimatedVisibility(
-                        visible = showLyrics,
-                        enter = fadeIn(),
-                        exit = fadeOut()
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 12.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                "[00:12.00] Waiting for lyrics data...",
-                                color = Color.White.copy(alpha = 0.4f),
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                "[00:15.50] Connect a lyrics source to enable sync",
-                                color = Color.White.copy(alpha = 0.7f),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
                 }
             }
         }
@@ -447,6 +460,180 @@ fun NowPlayingScreen(
                 duration = SnackbarDuration.Short
             )
         }
+    }
+}
+
+// ── Synchronized Lyrics Panel ──────────────────────────────────────────────────
+
+/**
+ * A LazyColumn-based lyrics panel that highlights the currently active line
+ * and smoothly auto-scrolls to keep it centered.
+ *
+ * - Active line: full white, bold, scaled up slightly.
+ * - Upcoming lines: dimmed white.
+ * - Past lines: further dimmed.
+ * - Tapping a line seeks playback to that timestamp.
+ */
+@Composable
+private fun SynchronizedLyricsPanel(
+    lyrics: List<LyricLine>,
+    currentPositionMs: Long,
+    onSeekTo: (Long) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val colorScheme = MaterialTheme.colorScheme
+
+    if (lyrics.isEmpty()) {
+        // ── Empty state ──
+        Box(
+            modifier = modifier
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color.White.copy(alpha = 0.05f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    Icons.Default.Lyrics,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.2f),
+                    modifier = Modifier.size(48.dp)
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    "No synchronized lyrics available",
+                    color = Color.White.copy(alpha = 0.4f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "Lyrics will appear here when available",
+                    color = Color.White.copy(alpha = 0.25f),
+                    style = MaterialTheme.typography.bodySmall,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+        return
+    }
+
+    // ── Active lyric index (derived, recomputes when position changes) ──
+    val activeIndex by remember(lyrics) {
+        derivedStateOf { findActiveLyricIndex(lyrics, currentPositionMs) }
+    }
+
+    val listState = rememberLazyListState()
+
+    // ── Auto-scroll: smoothly animate to keep the active line centered ──
+    LaunchedEffect(activeIndex) {
+        if (activeIndex >= 0) {
+            // Calculate offset to center the active item in the visible area.
+            // We use a negative offset to push the item towards the vertical center.
+            val viewportHeight = listState.layoutInfo.viewportSize.height
+            val centerOffset = -(viewportHeight / 2) + 40 // 40px approximation for half line height
+            listState.animateScrollToItem(
+                index = activeIndex,
+                scrollOffset = centerOffset
+            )
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color.White.copy(alpha = 0.05f))
+    ) {
+        // Top + bottom gradient fades for a premium scroll effect
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Leading spacer items so the first lyric can be centered
+            item { Spacer(modifier = Modifier.height(100.dp)) }
+
+            itemsIndexed(
+                items = lyrics,
+                key = { index, line -> "${index}_${line.timestampMs}" }
+            ) { index, line ->
+                val isActive = index == activeIndex
+                val isPast = index < activeIndex
+
+                // Animated color transition
+                val textColor by animateColorAsState(
+                    targetValue = when {
+                        isActive -> Color.White
+                        isPast -> Color.White.copy(alpha = 0.3f)
+                        else -> Color.White.copy(alpha = 0.5f)
+                    },
+                    animationSpec = tween(durationMillis = 300),
+                    label = "lyric_color_$index"
+                )
+
+                // Subtle scale-up on the active line
+                val scale by animateFloatAsState(
+                    targetValue = if (isActive) 1.05f else 1.0f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessLow
+                    ),
+                    label = "lyric_scale_$index"
+                )
+
+                Text(
+                    text = line.text.ifEmpty { "♪" },
+                    color = textColor,
+                    fontSize = if (isActive) 20.sp else 16.sp,
+                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+                    textAlign = TextAlign.Center,
+                    lineHeight = if (isActive) 28.sp else 22.sp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .scale(scale)
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { onSeekTo(line.timestampMs) }
+                        .padding(vertical = 6.dp, horizontal = 4.dp)
+                )
+            }
+
+            // Trailing spacer so the last lyric can be centered
+            item { Spacer(modifier = Modifier.height(100.dp)) }
+        }
+
+        // Top fade gradient
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(40.dp)
+                .align(Alignment.TopCenter)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Black.copy(alpha = 0.6f),
+                            Color.Transparent
+                        )
+                    )
+                )
+        )
+
+        // Bottom fade gradient
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(40.dp)
+                .align(Alignment.BottomCenter)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            Color.Black.copy(alpha = 0.6f)
+                        )
+                    )
+                )
+        )
     }
 }
 
@@ -566,6 +753,7 @@ fun NowPlayingScreenRoot(
     val duration by viewModel.duration.collectAsState()
     val isShuffleEnabled by viewModel.isShuffleEnabled.collectAsState()
     val repeatMode by viewModel.repeatMode.collectAsState()
+    val lyrics by viewModel.lyrics.collectAsState()
 
     NowPlayingScreen(
         currentTrack = currentTrack,
@@ -575,6 +763,7 @@ fun NowPlayingScreenRoot(
         duration = duration,
         isShuffleEnabled = isShuffleEnabled,
         repeatMode = repeatMode,
+        lyrics = lyrics,
         onPlayPauseToggle = viewModel::togglePlayPause,
         onSkipNext = viewModel::skipNext,
         onSkipPrevious = viewModel::skipPrevious,

@@ -17,6 +17,12 @@ interface TrackDao {
 
     @Query("SELECT * FROM tracks")
     fun getAllTracks(): Flow<List<TrackEntity>>
+
+    @Query("UPDATE tracks SET lyrics_lrc = :lyricsLrc WHERE trackId = :trackId")
+    suspend fun updateLyrics(trackId: String, lyricsLrc: String)
+
+    @Query("SELECT lyrics_lrc FROM tracks WHERE trackId = :trackId")
+    suspend fun getLyricsById(trackId: String): String?
 }
 
 @Dao

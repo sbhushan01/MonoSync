@@ -14,7 +14,8 @@ data class TrackEntity(
     val artists: List<String>,
     val albumArtUrl: String,
     val durationMs: Long,
-    val resolvedAudioUrl: String? = null
+    val resolvedAudioUrl: String? = null,
+    @ColumnInfo(name = "lyrics_lrc") val lyricsLrc: String? = null
 )
 
 @Entity(tableName = "track_cache")

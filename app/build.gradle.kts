@@ -129,9 +129,22 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
 
+// Ensure secrets.properties exists so the secrets-gradle-plugin does not fail
+// when the file is absent (e.g. on a fresh clone without a local secrets file).
+val secretsPropertiesFile = rootProject.file("secrets.properties")
+if (!secretsPropertiesFile.exists()) {
+    val created = secretsPropertiesFile.createNewFile()
+    if (created) {
+        logger.lifecycle("Warning: secrets.properties not found. Created empty placeholder for build.")
+    } else {
+        logger.warn("Warning: secrets.properties not found and could not be created. Build may fail if secret values are required.")
+    }
+}
+
 secrets {
     // Optionally specify a different file name containing your secrets.
     // The plugin defaults to "local.properties"
     propertiesFileName = "secrets.properties"
+    defaultPropertiesFileName = "local.properties"
 }
 

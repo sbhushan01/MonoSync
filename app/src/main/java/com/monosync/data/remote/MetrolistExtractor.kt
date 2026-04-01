@@ -47,7 +47,7 @@ class MetrolistYtmExtractor(
         private const val INNERTUBE_PLAYER_URL =
             "https://music.youtube.com/youtubei/v1/player"
 
-        private const val INNERTUBE_API_KEY = "AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30"
+        private val INNERTUBE_API_KEY = com.monosync.BuildConfig.YTM_API_KEY
 
         // WEB_REMIX client — the InnerTube client used by YouTube Music web
         private const val CLIENT_NAME = "WEB_REMIX"

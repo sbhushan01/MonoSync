@@ -1,0 +1,12 @@
+# Project-specific ignored files
+/secrets.properties
+/local.properties
+/.idea/
+.gradle/
+build/
+app/build/
+*.iml
+
+# Keystore defaults for signing
+*.jks
+/keystore.properties

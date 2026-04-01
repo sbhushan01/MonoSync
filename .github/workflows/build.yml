@@ -30,7 +30,10 @@ jobs:
 
       - name: Create secrets.properties
         run: |
-          echo "MAPS_API_KEY=${{ secrets.MAPS_API_KEY }}" > "$GITHUB_WORKSPACE/secrets.properties"
+          {
+            echo "MAPS_API_KEY=${{ secrets.MAPS_API_KEY }}"
+            echo "YTM_API_KEY=${{ secrets.YTM_API_KEY }}"
+          } > "$GITHUB_WORKSPACE/secrets.properties"
 
       - name: Build Debug APK
         run: ./gradlew assembleDebug --no-daemon --stacktrace

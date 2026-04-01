@@ -25,6 +25,16 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+
+        val secretsProps = Properties()
+        val secretsFile = rootProject.file("secrets.properties")
+        if (secretsFile.exists()) {
+            secretsFile.inputStream().use { secretsProps.load(it) }
+        }
+        val ytmApiKey = (secretsProps.getProperty("YTM_API_KEY") ?: "")
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+        buildConfigField("String", "YTM_API_KEY", "\"$ytmApiKey\"")
     }
 
     signingConfigs {

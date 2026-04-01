@@ -141,6 +141,18 @@ if (!secretsPropertiesFile.exists()) {
     }
 }
 
+// Ensure local.properties exists so the secrets-gradle-plugin does not fail
+// when using it as the defaultPropertiesFileName (e.g. in CI or on a fresh clone).
+val localPropertiesFile = rootProject.file("local.properties")
+if (!localPropertiesFile.exists()) {
+    val created = localPropertiesFile.createNewFile()
+    if (created) {
+        logger.lifecycle("Warning: local.properties not found. Created empty placeholder for build.")
+    } else {
+        logger.warn("Warning: local.properties could not be created. The file may already exist or there may be a permissions issue. Build may fail if default property values are required.")
+    }
+}
+
 secrets {
     // Optionally specify a different file name containing your secrets.
     // The plugin defaults to "local.properties"

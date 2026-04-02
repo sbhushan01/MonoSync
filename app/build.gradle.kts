@@ -8,6 +8,7 @@ plugins {
     id("com.google.dagger.hilt.android")
     id("kotlin-parcelize")
     id("com.google.android.libraries.mapsplatform.secrets-gradle-plugin")
+    id("org.jetbrains.kotlin.plugin.serialization")
 }
 
 android {
@@ -41,7 +42,6 @@ android {
             val safe = (raw ?: "").replace("\\", "\\\\").replace("\"", "\\\"")
             return "\"$safe\""
         }
-        buildConfigField("String", "MAPS_API_KEY", escapedQuoted(secretsProps.getProperty("MAPS_API_KEY")))
         buildConfigField("String", "YTM_API_KEY", escapedQuoted(secretsProps.getProperty("YTM_API_KEY")))
     }
 
@@ -139,6 +139,13 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-guava:1.8.0")
 
+    // Ktor & Serialization
+    implementation("io.ktor:ktor-client-core:2.3.7")
+    implementation("io.ktor:ktor-client-cio:2.3.7")
+    implementation("io.ktor:ktor-client-content-negotiation:2.3.7")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.7")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
+
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
@@ -181,6 +188,5 @@ secrets {
     // Prevent the plugin from auto-generating BuildConfig fields for these keys.
     // They are declared manually in defaultConfig above with proper quoting and
     // an empty-string fallback so that CI builds without secrets still compile.
-    ignoreList.add("MAPS_API_KEY")
     ignoreList.add("YTM_API_KEY")
 }

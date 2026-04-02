@@ -185,7 +185,7 @@ fun SearchScreen(
 
             if (!errorMessage.isNullOrBlank()) {
                 Text(
-                    text = errorMessage ?: "Search failed",
+                    text = errorMessage.orEmpty(),
                     style = MaterialTheme.typography.bodyMedium,
                     color = colorScheme.error
                 )

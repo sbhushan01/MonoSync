@@ -1,0 +1,30 @@
+> Task :app:checkKotlinGradlePluginConfigurationErrors
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:generateDebugBuildConfig UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :app:processDebugResources UP-TO-DATE
+> Task :app:kspDebugKotlin
+
+> Task :app:compileDebugKotlin
+w: file:///C:/Users/ASUS/MonoSync/app/src/main/java/com/monosync/data/remote/MetrolistExtractor.kt:238:21 Variable 'endpoint' is never used
+w: file:///C:/Users/ASUS/MonoSync/app/src/main/java/com/monosync/playback/PlaybackService.kt:35:25 'constructor SilenceSkippingAudioProcessor(Long, Long, Short)' is deprecated. Deprecated in Java
+w: file:///C:/Users/ASUS/MonoSync/app/src/main/java/com/monosync/ui/library/LibraryScreen.kt:55:63 'PlaylistPlay: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.PlaylistPlay
+w: file:///C:/Users/ASUS/MonoSync/app/src/main/java/com/monosync/ui/library/LibraryScreen.kt:56:58 'PlaylistPlay: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.PlaylistPlay
+w: file:///C:/Users/ASUS/MonoSync/app/src/main/java/com/monosync/ui/library/LibraryScreen.kt:57:57 'PlaylistPlay: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.PlaylistPlay
+w: file:///C:/Users/ASUS/MonoSync/app/src/main/java/com/monosync/ui/navigation/MonoSyncNavigation.kt:49:5 Parameter 'navController' is never used
+w: file:///C:/Users/ASUS/MonoSync/app/src/main/java/com/monosync/ui/player/NowPlayingScreen.kt:484:9 Variable 'colorScheme' is never used
+
+BUILD SUCCESSFUL in 18s
+17 actionable tasks: 3 executed, 14 up-to-date

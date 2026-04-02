@@ -54,6 +54,7 @@ fun MonoSyncNavHost(
     modifier: Modifier = Modifier
 ) {
     val playerViewModel: PlayerViewModel = hiltViewModel()
+    val searchViewModel: com.monosync.ui.search.MusicViewModel = hiltViewModel()
     var selectedTab by remember { mutableIntStateOf(0) }
 
     val colorScheme = MaterialTheme.colorScheme
@@ -85,16 +86,24 @@ fun MonoSyncNavHost(
                                     trackInfo = track
                                 )
                             })
-                            1 -> SearchScreen(onResultClick = { track ->
-                                playerViewModel.loadAndPlayTrack(
-                                    ytmTrack = YtmTrack(
-                                        videoId = track.id,
-                                        title = track.title,
-                                        artist = track.artist
-                                    ),
-                                    trackInfo = track
-                                )
-                            })
+                            1 -> com.monosync.ui.search.YtmSearchScreen(
+                                viewModel = searchViewModel,
+                                onTrackClick = { track ->
+                                    playerViewModel.loadAndPlayTrack(
+                                        ytmTrack = com.monosync.data.remote.YtmTrack(
+                                            videoId = track.videoId,
+                                            title = track.title,
+                                            artist = track.artist
+                                        ),
+                                        trackInfo = com.monosync.model.Track(
+                                            id = track.videoId,
+                                            title = track.title,
+                                            artist = track.artist,
+                                            albumArtUrl = track.thumbnail
+                                        )
+                                    )
+                                }
+                            )
                             2 -> LibraryScreen()
                             3 -> SettingsScreen()
                         }

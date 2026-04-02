@@ -26,7 +26,8 @@ class YtmRepository @Inject constructor() {
 
     suspend fun search(query: String): List<YtmTrack> = withContext(Dispatchers.IO) {
         try {
-            val response: YtmSearchResponse = client.post("https://music.youtube.com/youtubei/v1/search") {
+            val apiKey = com.monosync.BuildConfig.YTM_API_KEY
+            val response: YtmSearchResponse = client.post("https://music.youtube.com/youtubei/v1/search?key=$apiKey") {
                 contentType(ContentType.Application.Json)
                 setBody(YtmSearchRequest(
                     context = YtmContext(YtmClient()),

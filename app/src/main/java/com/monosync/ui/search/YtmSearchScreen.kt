@@ -25,6 +25,7 @@ import coil.compose.AsyncImage
 
 @Composable
 fun YtmSearchScreen(
+    onTrackClick: (com.monosync.ytm.YtmTrack) -> Unit,
     viewModel: MusicViewModel,
     modifier: Modifier = Modifier
 ) {
@@ -53,7 +54,7 @@ fun YtmSearchScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 4.dp)
-                        .clickable { /* play track */ }
+                        .clickable { onTrackClick(track) }
                 ) {
                     Row(
                         modifier = Modifier.padding(12.dp),

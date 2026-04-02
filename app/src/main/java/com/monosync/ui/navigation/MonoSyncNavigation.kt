@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
+import com.monosync.data.remote.YtmTrack
 import com.monosync.ui.home.HomeScreen
 import com.monosync.ui.library.LibraryScreen
 import com.monosync.ui.player.NowPlayingScreenRoot
@@ -74,8 +75,26 @@ fun MonoSyncNavHost(
                 Box(modifier = Modifier.weight(1f)) {
                     Crossfade(targetState = selectedTab, label = "tab_transition") { tab ->
                         when (tab) {
-                            0 -> HomeScreen(onTrackClick = { /* wire to viewModel */ })
-                            1 -> SearchScreen()
+                            0 -> HomeScreen(onTrackClick = { track ->
+                                playerViewModel.loadAndPlayTrack(
+                                    ytmTrack = YtmTrack(
+                                        videoId = track.id,
+                                        title = track.title,
+                                        artist = track.artist
+                                    ),
+                                    trackInfo = track
+                                )
+                            })
+                            1 -> SearchScreen(onResultClick = { track ->
+                                playerViewModel.loadAndPlayTrack(
+                                    ytmTrack = YtmTrack(
+                                        videoId = track.id,
+                                        title = track.title,
+                                        artist = track.artist
+                                    ),
+                                    trackInfo = track
+                                )
+                            })
                             2 -> LibraryScreen()
                             3 -> SettingsScreen()
                         }

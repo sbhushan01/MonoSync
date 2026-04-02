@@ -2,7 +2,6 @@ package com.monosync.ui.search
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,13 +23,16 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,20 +44,49 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.monosync.data.remote.MonochromeResult
+import com.monosync.model.Track
 
-
+data class GenreCategory(
+    val name: String,
+    val color: Color
+)
 
 @Composable
 fun SearchScreen(
+    onResultClick: (Track) -> Unit,
+    viewModel: SearchViewModel = hiltViewModel(),
     modifier: Modifier = Modifier
 ) {
     val colorScheme = MaterialTheme.colorScheme
+    var searchQuery by remember { mutableStateOf("") }
+    val isLoading by viewModel.isLoading.collectAsState()
+    val results by viewModel.results.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
+
+    val genres = listOf(
+        GenreCategory("Hip-Hop", Color(0xFFEF4444)),
+        GenreCategory("Pop", Color(0xFF8B5CF6)),
+        GenreCategory("Rock", Color(0xFFF59E0B)),
+        GenreCategory("Electronic", Color(0xFF06B6D4)),
+        GenreCategory("R&B", Color(0xFFEC4899)),
+        GenreCategory("Jazz", Color(0xFF10B981)),
+        GenreCategory("Classical", Color(0xFF6366F1)),
+        GenreCategory("Lo-Fi", Color(0xFF14B8A6)),
+        GenreCategory("Indie", Color(0xFFF97316)),
+        GenreCategory("Metal", Color(0xFF64748B)),
+        GenreCategory("Ambient", Color(0xFF7C3AED)),
+        GenreCategory("K-Pop", Color(0xFFE11D48)),
+    )
 
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(colorScheme.background)
+            .padding(horizontal = 20.dp)
     ) {
         Spacer(modifier = Modifier.height(24.dp))
 
@@ -63,14 +94,184 @@ fun SearchScreen(
             text = "Search",
             style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold,
-            color = colorScheme.onBackground,
-            modifier = Modifier.padding(horizontal = 20.dp)
+            color = colorScheme.onBackground
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        YtmSearchScreen(viewModel = hiltViewModel())
+        // Search bar
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = {
+                Text(
+                    "Songs, artists, or albums",
+                    color = colorScheme.onSurfaceVariant
+                )
+            },
+            leadingIcon = {
+                Icon(
+                    Icons.Default.Search,
+                    contentDescription = "Search",
+                    tint = colorScheme.onSurfaceVariant
+                )
+            },
+            trailingIcon = {
+                if (searchQuery.isNotEmpty()) {
+                    IconButton(onClick = { searchQuery = "" }) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Clear",
+                            tint = colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            },
+            singleLine = true,
+            shape = RoundedCornerShape(12.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = colorScheme.surfaceVariant,
+                unfocusedContainerColor = colorScheme.surfaceVariant,
+                focusedBorderColor = colorScheme.primary,
+                unfocusedBorderColor = Color.Transparent,
+                cursorColor = colorScheme.primary
+            ),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { viewModel.search(searchQuery) })
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        if (searchQuery.isBlank() && results.isEmpty()) {
+            Text(
+                text = "Browse by Genre",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = colorScheme.onBackground
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Genre grid
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(bottom = 100.dp)
+            ) {
+                items(genres) { genre ->
+                    GenreCard(genre = genre)
+                }
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Results",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = colorScheme.onBackground
+                )
+                TextButton(onClick = { viewModel.search(searchQuery) }) {
+                    Text(if (isLoading) "Searching..." else "Search")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (!errorMessage.isNullOrBlank()) {
+                Text(
+                    text = errorMessage.orEmpty(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colorScheme.error
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 100.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(results) { result ->
+                    SearchResultItem(
+                        result = result,
+                        onClick = {
+                            onResultClick(
+                                Track(
+                                    id = result.fileId,
+                                    title = result.trackName,
+                                    artist = result.artistName
+                                )
+                            )
+                        }
+                    )
+                }
+            }
+        }
     }
 }
 
+@Composable
+private fun SearchResultItem(
+    result: MonochromeResult,
+    onClick: () -> Unit
+) {
+    val colorScheme = MaterialTheme.colorScheme
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(colorScheme.surfaceVariant.copy(alpha = 0.45f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = result.trackName,
+                style = MaterialTheme.typography.titleMedium,
+                color = colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = result.artistName,
+                style = MaterialTheme.typography.bodySmall,
+                color = colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Icon(
+            imageVector = Icons.Default.PlayArrow,
+            contentDescription = "Play",
+            tint = colorScheme.onSurfaceVariant
+        )
+    }
+}
 
+@Composable
+private fun GenreCard(genre: GenreCategory) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(80.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(genre.color.copy(alpha = 0.8f))
+            .clickable { /* navigate to genre */ }
+            .padding(16.dp),
+        contentAlignment = Alignment.BottomStart
+    ) {
+        Text(
+            text = genre.name,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = Color.White
+        )
+    }
+}

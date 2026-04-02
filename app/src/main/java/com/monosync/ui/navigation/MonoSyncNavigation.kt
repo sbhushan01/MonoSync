@@ -1,12 +1,9 @@
 package com.monosync.ui.navigation
 
 import androidx.compose.animation.Crossfade
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LibraryMusic
@@ -23,18 +20,17 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import com.monosync.data.remote.YtmTrack
+import com.monosync.model.Track
 import com.monosync.ui.home.HomeScreen
 import com.monosync.ui.library.LibraryScreen
 import com.monosync.ui.player.NowPlayingScreenRoot
@@ -54,7 +50,6 @@ fun MonoSyncNavHost(
     modifier: Modifier = Modifier
 ) {
     val playerViewModel: PlayerViewModel = hiltViewModel()
-    val searchViewModel: com.monosync.ui.search.MusicViewModel = hiltViewModel()
     var selectedTab by remember { mutableIntStateOf(0) }
 
     val colorScheme = MaterialTheme.colorScheme
@@ -86,24 +81,16 @@ fun MonoSyncNavHost(
                                     trackInfo = track
                                 )
                             })
-                            1 -> com.monosync.ui.search.YtmSearchScreen(
-                                viewModel = searchViewModel,
-                                onTrackClick = { track ->
-                                    playerViewModel.loadAndPlayTrack(
-                                        ytmTrack = com.monosync.data.remote.YtmTrack(
-                                            videoId = track.videoId,
-                                            title = track.title,
-                                            artist = track.artist
-                                        ),
-                                        trackInfo = com.monosync.model.Track(
-                                            id = track.videoId,
-                                            title = track.title,
-                                            artist = track.artist,
-                                            albumArtUrl = track.thumbnail
-                                        )
-                                    )
-                                }
-                            )
+                            1 -> SearchScreen(onResultClick = { track ->
+                                playerViewModel.loadAndPlayTrack(
+                                    ytmTrack = YtmTrack(
+                                        videoId = track.id,
+                                        title = track.title,
+                                        artist = track.artist
+                                    ),
+                                    trackInfo = track
+                                )
+                            })
                             2 -> LibraryScreen()
                             3 -> SettingsScreen()
                         }

@@ -3,7 +3,7 @@ package com.monosync.ui.search
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.monosync.data.remote.MonochromeApiService
-import com.monosync.data.remote.MonochromeResult
+import com.monosync.data.remote.MonochromeTrackItem
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,7 +18,7 @@ class SearchViewModel @Inject constructor(
     private val _isLoading = MutableStateFlow(false)
     val isLoading = _isLoading.asStateFlow()
 
-    private val _results = MutableStateFlow<List<MonochromeResult>>(emptyList())
+    private val _results = MutableStateFlow<List<MonochromeTrackItem>>(emptyList())
     val results = _results.asStateFlow()
 
     private val _errorMessage = MutableStateFlow<String?>(null)
@@ -36,7 +36,8 @@ class SearchViewModel @Inject constructor(
             _isLoading.value = true
             _errorMessage.value = null
             try {
-                _results.value = monochromeApiService.searchFiles(trimmedQuery)
+                val response = monochromeApiService.searchTracks(trimmedQuery)
+                _results.value = response.data?.items ?: emptyList()
             } catch (e: Exception) {
                 _results.value = emptyList()
                 _errorMessage.value = e.message ?: "Search failed"

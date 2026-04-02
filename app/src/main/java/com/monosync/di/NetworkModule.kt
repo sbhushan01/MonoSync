@@ -35,7 +35,7 @@ object NetworkModule {
     @Singleton
     fun provideRetrofit(okHttpClient: OkHttpClient): Retrofit {
         return Retrofit.Builder()
-            .baseUrl("https://monochrome.tf/")
+            .baseUrl("https://api.monochrome.tf/")
             .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()

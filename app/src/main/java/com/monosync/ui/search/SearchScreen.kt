@@ -24,6 +24,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
@@ -43,12 +44,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.monosync.data.remote.MonochromeResult
+import coil.compose.AsyncImage
+import com.monosync.data.remote.MonochromeTrackItem
 import com.monosync.model.Track
 
 data class GenreCategory(
@@ -202,11 +205,17 @@ fun SearchScreen(
                     SearchResultItem(
                         result = result,
                         onClick = {
+                            val artistName = result.artist?.name
+                                ?: result.artists?.firstOrNull()?.name
+                                ?: ""
+                            val albumArt = result.album?.coverUrl() ?: ""
                             onResultClick(
                                 Track(
-                                    id = result.fileId,
-                                    title = result.trackName,
-                                    artist = result.artistName
+                                    id = result.id.toString(),
+                                    title = result.title,
+                                    artist = artistName,
+                                    albumArtUrl = albumArt,
+                                    durationMs = result.duration * 1000L
                                 )
                             )
                         }
@@ -219,10 +228,13 @@ fun SearchScreen(
 
 @Composable
 private fun SearchResultItem(
-    result: MonochromeResult,
+    result: MonochromeTrackItem,
     onClick: () -> Unit
 ) {
     val colorScheme = MaterialTheme.colorScheme
+    val artistName = result.artist?.name ?: result.artists?.firstOrNull()?.name ?: ""
+    val albumArt = result.album?.coverUrl()
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -232,16 +244,45 @@ private fun SearchResultItem(
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // Album art thumbnail
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center
+        ) {
+            if (!albumArt.isNullOrBlank()) {
+                AsyncImage(
+                    model = albumArt,
+                    contentDescription = result.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(8.dp))
+                )
+            } else {
+                Icon(
+                    Icons.Default.MusicNote,
+                    contentDescription = null,
+                    tint = colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = result.trackName,
+                text = result.title,
                 style = MaterialTheme.typography.titleMedium,
                 color = colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                text = result.artistName,
+                text = artistName,
                 style = MaterialTheme.typography.bodySmall,
                 color = colorScheme.onSurfaceVariant,
                 maxLines = 1,

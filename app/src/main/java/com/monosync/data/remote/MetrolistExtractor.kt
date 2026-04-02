@@ -27,15 +27,16 @@ data class YtmTrack(
  */
 interface MetrolistExtractor {
     suspend fun getPlayerResponse(videoId: String): JSONObject
-    fun extractSynchronizedLyrics(browseResponseObj: JSONObject): String?
+    suspend fun getNextResponse(videoId: String): JSONObject
+    fun extractSynchronizedLyrics(responseObj: JSONObject): String?
 }
 
 /**
  * YouTube Music Extractor Logic
  * Inspired by the MetrolistGroup/Metrolist GitHub repository.
  *
- * Makes real InnerTube API calls to retrieve player responses
- * containing streaming data, playability status, and metadata.
+ * Uses ANDROID_MUSIC client for player requests (returns direct stream URLs)
+ * and WEB_REMIX client for browse/next requests (lyrics, metadata).
  */
 class MetrolistYtmExtractor(
     private val httpClient: OkHttpClient
@@ -46,25 +47,26 @@ class MetrolistYtmExtractor(
 
         private const val INNERTUBE_PLAYER_URL =
             "https://music.youtube.com/youtubei/v1/player"
+        private const val INNERTUBE_NEXT_URL =
+            "https://music.youtube.com/youtubei/v1/next"
 
         private val INNERTUBE_API_KEY = com.monosync.BuildConfig.YTM_API_KEY
 
-        // WEB_REMIX client — the InnerTube client used by YouTube Music web
-        private const val CLIENT_NAME = "WEB_REMIX"
-        private const val CLIENT_VERSION = "1.20231214.01.00"
+        // ANDROID_MUSIC client — returns direct stream URLs without signature cipher
+        private const val PLAYER_CLIENT_NAME = "ANDROID_MUSIC"
+        private const val PLAYER_CLIENT_VERSION = "7.27.52"
+
+        // WEB_REMIX client — for search and browse/next endpoints
+        private const val WEB_CLIENT_NAME = "WEB_REMIX"
+        private const val WEB_CLIENT_VERSION = "1.20241127.01.00"
 
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
     }
 
     /**
-     * Calls the YouTube Music InnerTube player endpoint for the given [videoId].
-     *
-     * Constructs the POST body with WEB_REMIX client context, sends the request
-     * on [Dispatchers.IO], and parses the response JSON.
-     *
-     * @param videoId The YouTube video ID to fetch player data for.
-     * @return A [JSONObject] containing the full InnerTube player response.
-     * @throws IOException on network failures after logging the error.
+     * Calls the YouTube Music InnerTube player endpoint using ANDROID_MUSIC client.
+     * This client returns direct stream URLs in the `url` field of adaptive formats,
+     * avoiding the need for signature deciphering.
      */
     override suspend fun getPlayerResponse(videoId: String): JSONObject =
         withContext(Dispatchers.IO) {
@@ -73,46 +75,72 @@ class MetrolistYtmExtractor(
             val request = Request.Builder()
                 .url("$INNERTUBE_PLAYER_URL?key=$INNERTUBE_API_KEY&prettyPrint=false")
                 .header("Content-Type", "application/json")
-                .header("User-Agent", "com.google.android.youtube/17.36.4 (Linux; U; Android 12)")
+                .header("User-Agent",
+                    "com.google.android.apps.youtube.music/$PLAYER_CLIENT_VERSION " +
+                    "(Linux; U; Android 14; Pixel 8 Pro) gzip")
                 .header("X-Goog-Api-Format-Version", "2")
+                .post(requestBody.toString().toRequestBody(JSON_MEDIA_TYPE))
+                .build()
+
+            executeRequest(request, videoId, "player")
+        }
+
+    /**
+     * Calls the YouTube Music InnerTube /next endpoint using WEB_REMIX client.
+     * This endpoint returns lyrics, related tracks, and other metadata.
+     */
+    override suspend fun getNextResponse(videoId: String): JSONObject =
+        withContext(Dispatchers.IO) {
+            val requestBody = buildNextRequestBody(videoId)
+
+            val request = Request.Builder()
+                .url("$INNERTUBE_NEXT_URL?key=$INNERTUBE_API_KEY&prettyPrint=false")
+                .header("Content-Type", "application/json")
+                .header("User-Agent",
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
+                    "AppleWebKit/537.36 (KHTML, like Gecko) " +
+                    "Chrome/120.0.0.0 Safari/537.36")
                 .header("Origin", "https://music.youtube.com")
                 .header("Referer", "https://music.youtube.com/")
                 .post(requestBody.toString().toRequestBody(JSON_MEDIA_TYPE))
                 .build()
 
-            try {
-                val response = httpClient.newCall(request).execute()
-                val responseBody = response.body?.string()
-
-                if (!response.isSuccessful || responseBody.isNullOrBlank()) {
-                    Log.e(TAG, "InnerTube request failed: HTTP ${response.code}")
-                    throw IOException(
-                        "InnerTube player request failed with HTTP ${response.code}"
-                    )
-                }
-
-                JSONObject(responseBody)
-
-            } catch (e: SocketTimeoutException) {
-                Log.e(TAG, "InnerTube request timed out for videoId=$videoId", e)
-                throw IOException("InnerTube request timed out", e)
-
-            } catch (e: UnknownHostException) {
-                Log.e(TAG, "No network — cannot reach InnerTube for videoId=$videoId", e)
-                throw IOException("No network connection available", e)
-
-            } catch (e: IOException) {
-                Log.e(TAG, "Network error during InnerTube call for videoId=$videoId", e)
-                throw e
-
-            } catch (e: Exception) {
-                Log.e(TAG, "Unexpected error parsing InnerTube response for videoId=$videoId", e)
-                throw IOException("Failed to parse InnerTube response", e)
-            }
+            executeRequest(request, videoId, "next")
         }
+
+    private suspend fun executeRequest(
+        request: Request, videoId: String, endpoint: String
+    ): JSONObject {
+        try {
+            val response = httpClient.newCall(request).execute()
+            val responseBody = response.body?.string()
+
+            if (!response.isSuccessful || responseBody.isNullOrBlank()) {
+                Log.e(TAG, "InnerTube $endpoint request failed: HTTP ${response.code}")
+                throw IOException(
+                    "InnerTube $endpoint request failed with HTTP ${response.code}"
+                )
+            }
+
+            return JSONObject(responseBody)
+        } catch (e: SocketTimeoutException) {
+            Log.e(TAG, "InnerTube $endpoint timed out for videoId=$videoId", e)
+            throw IOException("InnerTube request timed out", e)
+        } catch (e: UnknownHostException) {
+            Log.e(TAG, "No network for videoId=$videoId", e)
+            throw IOException("No network connection available", e)
+        } catch (e: IOException) {
+            Log.e(TAG, "Network error during $endpoint for videoId=$videoId", e)
+            throw e
+        } catch (e: Exception) {
+            Log.e(TAG, "Unexpected error parsing $endpoint for videoId=$videoId", e)
+            throw IOException("Failed to parse InnerTube response", e)
+        }
+    }
 
     /**
      * Builds the InnerTube JSON request body for the player endpoint.
+     * Uses ANDROID_MUSIC client context for direct stream URLs.
      */
     private fun buildPlayerRequestBody(videoId: String): JSONObject {
         return JSONObject().apply {
@@ -120,32 +148,14 @@ class MetrolistYtmExtractor(
 
             put("context", JSONObject().apply {
                 put("client", JSONObject().apply {
-                    put("clientName", CLIENT_NAME)
-                    put("clientVersion", CLIENT_VERSION)
+                    put("clientName", PLAYER_CLIENT_NAME)
+                    put("clientVersion", PLAYER_CLIENT_VERSION)
+                    put("androidSdkVersion", 34)
+                    put("osName", "Android")
+                    put("osVersion", "14")
+                    put("platform", "MOBILE")
                     put("hl", "en")
                     put("gl", "US")
-                    put("platform", "DESKTOP")
-                    put("userAgent",
-                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
-                        "AppleWebKit/537.36 (KHTML, like Gecko) " +
-                        "Chrome/120.0.0.0 Safari/537.36"
-                    )
-                })
-
-                put("user", JSONObject().apply {
-                    put("lockedSafetyMode", false)
-                })
-
-                put("request", JSONObject().apply {
-                    put("useSsl", true)
-                    put("internalExperimentFlags", org.json.JSONArray())
-                    put("consistencyTokenJars", org.json.JSONArray())
-                })
-            })
-
-            put("playbackContext", JSONObject().apply {
-                put("contentPlaybackContext", JSONObject().apply {
-                    put("signatureTimestamp", "19635")
                 })
             })
 
@@ -155,8 +165,28 @@ class MetrolistYtmExtractor(
     }
 
     /**
-     * Parses the InnerTube JSON response for playback URL extraction.
-     * Selects the highest-bitrate audio-only adaptive format with a direct URL.
+     * Builds the InnerTube JSON request body for the /next endpoint.
+     * Uses WEB_REMIX client context (needed for lyrics/browse data).
+     */
+    private fun buildNextRequestBody(videoId: String): JSONObject {
+        return JSONObject().apply {
+            put("videoId", videoId)
+            put("isAudioOnly", true)
+
+            put("context", JSONObject().apply {
+                put("client", JSONObject().apply {
+                    put("clientName", WEB_CLIENT_NAME)
+                    put("clientVersion", WEB_CLIENT_VERSION)
+                    put("hl", "en")
+                    put("gl", "US")
+                    put("platform", "DESKTOP")
+                })
+            })
+        }
+    }
+
+    /**
+     * Parses the InnerTube player response for the highest-bitrate audio stream URL.
      */
     fun extractStreamUrl(playerResponseObj: JSONObject): String? {
         val playabilityStatus = playerResponseObj.optJSONObject("playabilityStatus")
@@ -173,14 +203,13 @@ class MetrolistYtmExtractor(
             val mimeType = format.optString("mimeType", "")
             val bitrate = format.optInt("bitrate", 0)
 
-            if (mimeType.startsWith("audio/webm") || mimeType.startsWith("audio/mp4")) {
+            if (mimeType.startsWith("audio/")) {
                 if (bitrate > highestBitrate) {
                     highestBitrate = bitrate
                     val directUrl = format.optString("url", "")
                     if (directUrl.isNotEmpty()) {
                         bestUrl = directUrl
                     }
-                    // Skip signatureCipher URLs — they require JS runtime deciphering
                 }
             }
         }
@@ -188,16 +217,54 @@ class MetrolistYtmExtractor(
     }
 
     /**
-     * Parses the "next" endpoint JSON response to extract synchronized LRC lyrics.
+     * Extracts synchronized lyrics from the /next endpoint response.
+     *
+     * Tries two response structures:
+     * 1. singleColumnMusicWatchNextResultsRenderer (from /next endpoint)
+     * 2. singleColumnBrowseResultsRenderer (from /browse endpoint, legacy)
      */
-    override fun extractSynchronizedLyrics(browseResponseObj: JSONObject): String? {
+    override fun extractSynchronizedLyrics(responseObj: JSONObject): String? {
         return try {
-            val tabs = browseResponseObj
+            // Path 1: /next endpoint response structure
+            val watchNextTabs = responseObj
+                .optJSONObject("contents")
+                ?.optJSONObject("singleColumnMusicWatchNextResultsRenderer")
+                ?.optJSONObject("tabbedRenderer")
+                ?.optJSONObject("watchNextTabbedResultsRenderer")
+                ?.optJSONArray("tabs")
+
+            if (watchNextTabs != null && watchNextTabs.length() > 1) {
+                val lyricsTab = watchNextTabs.optJSONObject(1)
+                val endpoint = lyricsTab
+                    ?.optJSONObject("tabRenderer")
+                    ?.optJSONObject("endpoint")
+                    ?.optJSONObject("browseEndpoint")
+                    ?.optString("browseId")
+
+                // If we have a browseId, the lyrics need a separate /browse call.
+                // For now, try to extract inline lyrics if present.
+                val inlineLyrics = lyricsTab
+                    ?.optJSONObject("tabRenderer")
+                    ?.optJSONObject("content")
+                    ?.optJSONObject("sectionListRenderer")
+                    ?.optJSONArray("contents")
+                    ?.optJSONObject(0)
+                    ?.optJSONObject("musicDescriptionShelfRenderer")
+                    ?.optJSONObject("description")
+                    ?.optJSONArray("runs")
+                    ?.optJSONObject(0)
+                    ?.optString("text")
+
+                if (!inlineLyrics.isNullOrBlank()) return inlineLyrics
+            }
+
+            // Path 2: Legacy /browse endpoint structure
+            val browseTabs = responseObj
                 .optJSONObject("contents")
                 ?.optJSONObject("singleColumnBrowseResultsRenderer")
                 ?.optJSONArray("tabs")
 
-            tabs?.optJSONObject(1)
+            browseTabs?.optJSONObject(1)
                 ?.optJSONObject("tabRenderer")
                 ?.optJSONObject("content")
                 ?.optJSONObject("sectionListRenderer")
@@ -209,7 +276,7 @@ class MetrolistYtmExtractor(
                 ?.optJSONObject(0)
                 ?.optString("text")
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.w(TAG, "Failed to extract lyrics", e)
             null
         }
     }

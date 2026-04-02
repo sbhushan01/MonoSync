@@ -140,10 +140,10 @@ class TrackRepository @Inject constructor(
             return cachedLyrics
         }
 
-        // 2. Fetch from network
+        // 2. Fetch from network (uses /next endpoint which contains lyrics data)
         return try {
-            val browseResponse = extractor.getPlayerResponse(videoId)
-            val lrcString = extractor.extractSynchronizedLyrics(browseResponse)
+            val nextResponse = extractor.getNextResponse(videoId)
+            val lrcString = extractor.extractSynchronizedLyrics(nextResponse)
 
             if (!lrcString.isNullOrBlank()) {
                 // 3. Persist to Room for offline access

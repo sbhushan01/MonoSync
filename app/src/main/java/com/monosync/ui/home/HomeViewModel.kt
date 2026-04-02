@@ -1,4 +1,4 @@
-package com.monosync.ui.search
+package com.monosync.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -11,33 +11,32 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class SearchViewModel @Inject constructor(
+class HomeViewModel @Inject constructor(
     private val ytmRepository: YtmRepository
 ) : ViewModel() {
 
-    private val _isLoading = MutableStateFlow(false)
+    private val _quickPicks = MutableStateFlow<List<Track>>(emptyList())
+    val quickPicks = _quickPicks.asStateFlow()
+
+    private val _recentTracks = MutableStateFlow<List<Track>>(emptyList())
+    val recentTracks = _recentTracks.asStateFlow()
+
+    private val _isLoading = MutableStateFlow(true)
     val isLoading = _isLoading.asStateFlow()
 
-    private val _results = MutableStateFlow<List<Track>>(emptyList())
-    val results = _results.asStateFlow()
+    init {
+        loadFeaturedTracks()
+    }
 
-    private val _errorMessage = MutableStateFlow<String?>(null)
-    val errorMessage = _errorMessage.asStateFlow()
-
-    fun search(query: String) {
-        val trimmedQuery = query.trim()
-        if (trimmedQuery.isBlank()) {
-            _results.value = emptyList()
-            _errorMessage.value = null
-            return
-        }
-
+    private fun loadFeaturedTracks() {
         viewModelScope.launch {
             _isLoading.value = true
-            _errorMessage.value = null
             try {
-                val ytmResults = ytmRepository.search(trimmedQuery)
-                _results.value = ytmResults.map { ytm ->
+                // Search for popular tracks to populate the home screen
+                val trendingResults = ytmRepository.search("trending music 2025")
+                val popularResults = ytmRepository.search("popular songs")
+
+                _quickPicks.value = trendingResults.take(6).map { ytm ->
                     Track(
                         id = ytm.videoId,
                         title = ytm.title,
@@ -46,16 +45,28 @@ class SearchViewModel @Inject constructor(
                         durationMs = parseDurationToMs(ytm.duration)
                     )
                 }
-                if (_results.value.isEmpty()) {
-                    _errorMessage.value = "No results found"
+
+                _recentTracks.value = popularResults.take(8).map { ytm ->
+                    Track(
+                        id = ytm.videoId,
+                        title = ytm.title,
+                        artist = ytm.artist,
+                        albumArtUrl = ytm.thumbnail,
+                        durationMs = parseDurationToMs(ytm.duration)
+                    )
                 }
             } catch (e: Exception) {
-                _results.value = emptyList()
-                _errorMessage.value = e.message ?: "Search failed"
+                // Show placeholder tracks if network fails
+                _quickPicks.value = emptyList()
+                _recentTracks.value = emptyList()
             } finally {
                 _isLoading.value = false
             }
         }
+    }
+
+    fun refresh() {
+        loadFeaturedTracks()
     }
 
     private fun parseDurationToMs(duration: String): Long {

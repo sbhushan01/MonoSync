@@ -51,7 +51,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
-import com.monosync.data.remote.MonochromeTrackItem
 import com.monosync.model.Track
 
 data class GenreCategory(
@@ -165,7 +164,13 @@ fun SearchScreen(
                 contentPadding = PaddingValues(bottom = 100.dp)
             ) {
                 items(genres) { genre ->
-                    GenreCard(genre = genre)
+                    GenreCard(
+                        genre = genre,
+                        onGenreClick = {
+                            searchQuery = genre.name
+                            viewModel.search(genre.name)
+                        }
+                    )
                 }
             }
         } else {
@@ -201,24 +206,10 @@ fun SearchScreen(
                 contentPadding = PaddingValues(bottom = 100.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(results) { result ->
+                items(results) { track ->
                     SearchResultItem(
-                        result = result,
-                        onClick = {
-                            val artistName = result.artist?.name
-                                ?: result.artists?.firstOrNull()?.name
-                                ?: ""
-                            val albumArt = result.album?.coverUrl() ?: ""
-                            onResultClick(
-                                Track(
-                                    id = result.id.toString(),
-                                    title = result.title,
-                                    artist = artistName,
-                                    albumArtUrl = albumArt,
-                                    durationMs = result.duration * 1000L
-                                )
-                            )
-                        }
+                        track = track,
+                        onClick = { onResultClick(track) }
                     )
                 }
             }
@@ -228,12 +219,10 @@ fun SearchScreen(
 
 @Composable
 private fun SearchResultItem(
-    result: MonochromeTrackItem,
+    track: Track,
     onClick: () -> Unit
 ) {
     val colorScheme = MaterialTheme.colorScheme
-    val artistName = result.artist?.name ?: result.artists?.firstOrNull()?.name ?: ""
-    val albumArt = result.album?.coverUrl()
 
     Row(
         modifier = Modifier
@@ -252,10 +241,10 @@ private fun SearchResultItem(
                 .background(colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center
         ) {
-            if (!albumArt.isNullOrBlank()) {
+            if (track.albumArtUrl.isNotEmpty()) {
                 AsyncImage(
-                    model = albumArt,
-                    contentDescription = result.title,
+                    model = track.albumArtUrl,
+                    contentDescription = track.title,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .fillMaxSize()
@@ -275,14 +264,14 @@ private fun SearchResultItem(
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = result.title,
+                text = track.title,
                 style = MaterialTheme.typography.titleMedium,
                 color = colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                text = artistName,
+                text = "${track.artist} · ${track.durationFormatted}",
                 style = MaterialTheme.typography.bodySmall,
                 color = colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -298,14 +287,17 @@ private fun SearchResultItem(
 }
 
 @Composable
-private fun GenreCard(genre: GenreCategory) {
+private fun GenreCard(
+    genre: GenreCategory,
+    onGenreClick: () -> Unit = {}
+) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(80.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(genre.color.copy(alpha = 0.8f))
-            .clickable { /* navigate to genre */ }
+            .clickable(onClick = onGenreClick)
             .padding(16.dp),
         contentAlignment = Alignment.BottomStart
     ) {

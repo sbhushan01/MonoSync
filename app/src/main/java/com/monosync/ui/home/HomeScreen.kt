@@ -21,11 +21,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,31 +36,20 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.monosync.model.Track
 
 @Composable
 fun HomeScreen(
     onTrackClick: (Track) -> Unit,
+    viewModel: HomeViewModel = hiltViewModel(),
     modifier: Modifier = Modifier
 ) {
     val colorScheme = MaterialTheme.colorScheme
-
-    // Sample data — in production, this comes from Room / ViewModel
-    val recentTracks = listOf(
-        Track(id = "1", title = "Midnight Drive", artist = "Synthwave Collective", durationMs = 245_000),
-        Track(id = "2", title = "Echoes of Silence", artist = "The Weeknd", durationMs = 232_000),
-        Track(id = "3", title = "Neon Lights", artist = "Daft Punk", durationMs = 312_000),
-        Track(id = "4", title = "After Hours", artist = "The Weeknd", durationMs = 361_000),
-        Track(id = "5", title = "Blinding Lights", artist = "The Weeknd", durationMs = 200_000),
-    )
-
-    val quickPicks = listOf(
-        Track(id = "6", title = "Starboy", artist = "The Weeknd", durationMs = 230_000),
-        Track(id = "7", title = "Save Your Tears", artist = "The Weeknd", durationMs = 215_000),
-        Track(id = "8", title = "Around the World", artist = "Daft Punk", durationMs = 428_000),
-        Track(id = "9", title = "Digital Love", artist = "Daft Punk", durationMs = 301_000),
-    )
+    val quickPicks by viewModel.quickPicks.collectAsState()
+    val recentTracks by viewModel.recentTracks.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
 
     LazyColumn(
         modifier = modifier
@@ -87,35 +79,79 @@ fun HomeScreen(
             }
         }
 
-        // Quick Picks — horizontal carousel
-        item {
-            SectionHeader(title = "Quick Picks")
-            Spacer(modifier = Modifier.height(12.dp))
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 20.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(quickPicks) { track ->
-                    QuickPickCard(
+        if (isLoading) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = colorScheme.primary)
+                }
+            }
+        } else {
+            // Quick Picks — horizontal carousel
+            if (quickPicks.isNotEmpty()) {
+                item {
+                    SectionHeader(title = "Quick Picks")
+                    Spacer(modifier = Modifier.height(12.dp))
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 20.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(quickPicks) { track ->
+                            QuickPickCard(
+                                track = track,
+                                onClick = { onTrackClick(track) }
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(28.dp))
+                }
+            }
+
+            // Recently Played — vertical list
+            if (recentTracks.isNotEmpty()) {
+                item {
+                    SectionHeader(title = "Popular Now")
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                items(recentTracks) { track ->
+                    TrackListItem(
                         track = track,
                         onClick = { onTrackClick(track) }
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(28.dp))
-        }
 
-        // Recently Played — vertical list
-        item {
-            SectionHeader(title = "Recently Played")
-            Spacer(modifier = Modifier.height(8.dp))
-        }
-
-        items(recentTracks) { track ->
-            TrackListItem(
-                track = track,
-                onClick = { onTrackClick(track) }
-            )
+            // Empty state
+            if (quickPicks.isEmpty() && recentTracks.isEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                Icons.Default.MusicNote,
+                                contentDescription = null,
+                                tint = colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                                modifier = Modifier.size(48.dp)
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = "Search for music to get started",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }

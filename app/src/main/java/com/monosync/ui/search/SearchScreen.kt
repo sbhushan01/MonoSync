@@ -2,6 +2,7 @@ package com.monosync.ui.search
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,38 +44,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 
-data class GenreCategory(
-    val name: String,
-    val color: Color
-)
+
 
 @Composable
 fun SearchScreen(
     modifier: Modifier = Modifier
 ) {
     val colorScheme = MaterialTheme.colorScheme
-    var searchQuery by remember { mutableStateOf("") }
-
-    val genres = listOf(
-        GenreCategory("Hip-Hop", Color(0xFFEF4444)),
-        GenreCategory("Pop", Color(0xFF8B5CF6)),
-        GenreCategory("Rock", Color(0xFFF59E0B)),
-        GenreCategory("Electronic", Color(0xFF06B6D4)),
-        GenreCategory("R&B", Color(0xFFEC4899)),
-        GenreCategory("Jazz", Color(0xFF10B981)),
-        GenreCategory("Classical", Color(0xFF6366F1)),
-        GenreCategory("Lo-Fi", Color(0xFF14B8A6)),
-        GenreCategory("Indie", Color(0xFFF97316)),
-        GenreCategory("Metal", Color(0xFF64748B)),
-        GenreCategory("Ambient", Color(0xFF7C3AED)),
-        GenreCategory("K-Pop", Color(0xFFE11D48)),
-    )
 
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(colorScheme.background)
-            .padding(horizontal = 20.dp)
     ) {
         Spacer(modifier = Modifier.height(24.dp))
 
@@ -82,95 +63,14 @@ fun SearchScreen(
             text = "Search",
             style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold,
-            color = colorScheme.onBackground
+            color = colorScheme.onBackground,
+            modifier = Modifier.padding(horizontal = 20.dp)
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Search bar
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = {
-                Text(
-                    "Songs, artists, or albums",
-                    color = colorScheme.onSurfaceVariant
-                )
-            },
-            leadingIcon = {
-                Icon(
-                    Icons.Default.Search,
-                    contentDescription = "Search",
-                    tint = colorScheme.onSurfaceVariant
-                )
-            },
-            trailingIcon = {
-                if (searchQuery.isNotEmpty()) {
-                    IconButton(onClick = { searchQuery = "" }) {
-                        Icon(
-                            Icons.Default.Close,
-                            contentDescription = "Clear",
-                            tint = colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            },
-            singleLine = true,
-            shape = RoundedCornerShape(12.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = colorScheme.surfaceVariant,
-                unfocusedContainerColor = colorScheme.surfaceVariant,
-                focusedBorderColor = colorScheme.primary,
-                unfocusedBorderColor = Color.Transparent,
-                cursorColor = colorScheme.primary
-            ),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { /* trigger search */ })
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Text(
-            text = "Browse by Genre",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = colorScheme.onBackground
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Genre grid
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(bottom = 100.dp)
-        ) {
-            items(genres) { genre ->
-                GenreCard(genre = genre)
-            }
-        }
+        YtmSearchScreen(viewModel = hiltViewModel())
     }
 }
 
-@Composable
-private fun GenreCard(genre: GenreCategory) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(80.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(genre.color.copy(alpha = 0.8f))
-            .clickable { /* navigate to genre */ }
-            .padding(16.dp),
-        contentAlignment = Alignment.BottomStart
-    ) {
-        Text(
-            text = genre.name,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = Color.White
-        )
-    }
-}
+

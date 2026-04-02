@@ -23,13 +23,16 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,7 +44,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.monosync.data.remote.MonochromeResult
+import com.monosync.model.Track
 
 data class GenreCategory(
     val name: String,
@@ -50,10 +57,15 @@ data class GenreCategory(
 
 @Composable
 fun SearchScreen(
+    onResultClick: (Track) -> Unit,
+    viewModel: SearchViewModel = hiltViewModel(),
     modifier: Modifier = Modifier
 ) {
     val colorScheme = MaterialTheme.colorScheme
     var searchQuery by remember { mutableStateOf("") }
+    val isLoading by viewModel.isLoading.collectAsState()
+    val results by viewModel.results.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
 
     val genres = listOf(
         GenreCategory("Hip-Hop", Color(0xFFEF4444)),
@@ -126,31 +138,120 @@ fun SearchScreen(
                 cursorColor = colorScheme.primary
             ),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { /* trigger search */ })
+            keyboardActions = KeyboardActions(onSearch = { viewModel.search(searchQuery) })
         )
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Text(
-            text = "Browse by Genre",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = colorScheme.onBackground
-        )
+        if (searchQuery.isBlank() && results.isEmpty()) {
+            Text(
+                text = "Browse by Genre",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = colorScheme.onBackground
+            )
 
-        Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-        // Genre grid
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(bottom = 100.dp)
-        ) {
-            items(genres) { genre ->
-                GenreCard(genre = genre)
+            // Genre grid
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(bottom = 100.dp)
+            ) {
+                items(genres) { genre ->
+                    GenreCard(genre = genre)
+                }
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Results",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = colorScheme.onBackground
+                )
+                TextButton(onClick = { viewModel.search(searchQuery) }) {
+                    Text(if (isLoading) "Searching..." else "Search")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (!errorMessage.isNullOrBlank()) {
+                Text(
+                    text = errorMessage ?: "Search failed",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colorScheme.error
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 100.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(results) { result ->
+                    SearchResultItem(
+                        result = result,
+                        onClick = {
+                            onResultClick(
+                                Track(
+                                    id = result.fileId,
+                                    title = result.trackName,
+                                    artist = result.artistName
+                                )
+                            )
+                        }
+                    )
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun SearchResultItem(
+    result: MonochromeResult,
+    onClick: () -> Unit
+) {
+    val colorScheme = MaterialTheme.colorScheme
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(colorScheme.surfaceVariant.copy(alpha = 0.45f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = result.trackName,
+                style = MaterialTheme.typography.titleMedium,
+                color = colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = result.artistName,
+                style = MaterialTheme.typography.bodySmall,
+                color = colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Icon(
+            imageVector = Icons.Default.PlayArrow,
+            contentDescription = "Play",
+            tint = colorScheme.onSurfaceVariant
+        )
     }
 }
 
